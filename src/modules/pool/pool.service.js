@@ -1,8 +1,9 @@
+import mongoose from "mongoose";
 import { Pool } from "./pool.model.js";
 import { PoolMember } from "./pool-member.model.js";
 import { Vehicle } from "../vehicle/vehicle.model.js";
 import { RideRequest } from "../ride/ride-request.model.js";
-
+import { RideStatusHistory } from "../ride/ride-status-history.model.js";
 import { canShareRoute } from "./route-matching.js";
 import { getRouteDistance } from "../ride/route-distance.js";
 import { calculateFare } from "../ride/fare.js";
@@ -156,4 +157,125 @@ export const matchExistingRideRequest = async (rideId) => {
   }
 
   return matchRideRequest(rideRequest);
+};
+
+export const updatePoolStatus = async ({ poolId, driverId, newStatus }) => {
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    const vehicle = await Vehicle.findOne({
+      driverId,
+    }).session(session);
+
+    if (!vehicle) {
+      throw new Error("Vehicle not found");
+    }
+
+    const pool = await Pool.findOne({
+      _id: poolId,
+      vehicleId: vehicle._id,
+    }).session(session);
+
+    if (!pool) {
+      throw new Error("Pool not found");
+    }
+
+    const allowedTransitions = {
+      OPEN: ["IN_PROGRESS"],
+      IN_PROGRESS: ["COMPLETED"],
+      COMPLETED: [],
+      CANCELLED: [],
+    };
+
+    if (!allowedTransitions[pool.status].includes(newStatus)) {
+      throw new Error(
+        `Cannot change pool status from ${pool.status} to ${newStatus}`,
+      );
+    }
+
+    pool.status = newStatus;
+
+    await pool.save({ session });
+
+    if (newStatus === "IN_PROGRESS") {
+      const rideRequests = await RideRequest.find({
+        poolId: pool._id,
+        status: "MATCHED",
+      }).session(session);
+
+      for (const rideRequest of rideRequests) {
+        rideRequest.status = "IN_PROGRESS";
+
+        await rideRequest.save({ session });
+
+        await RideStatusHistory.create(
+          [
+            {
+              poolId: pool._id,
+              rideRequestId: rideRequest._id,
+              status: "IN_PROGRESS",
+              changedBy: driverId,
+            },
+          ],
+          { session },
+        );
+      }
+    } else if (newStatus === "COMPLETED") {
+      const rideRequests = await RideRequest.find({
+        poolId: pool._id,
+        status: "IN_PROGRESS",
+      }).session(session);
+
+      for (const rideRequest of rideRequests) {
+        rideRequest.status = "COMPLETED";
+
+        await rideRequest.save({ session });
+
+        await RideStatusHistory.create(
+          [
+            {
+              poolId: pool._id,
+              rideRequestId: rideRequest._id,
+              status: "COMPLETED",
+              changedBy: driverId,
+            },
+          ],
+          { session },
+        );
+      }
+    }
+
+    await session.commitTransaction();
+
+    return pool;
+  } catch (error) {
+    await session.abortTransaction();
+
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+};
+
+
+
+export const matchWaitingRideRequests = async () => {
+  const waitingRequests = await RideRequest.find({
+    status: "WAITING",
+  });
+
+  for (const rideRequest of waitingRequests) {
+    try {
+      await matchRideRequest(rideRequest);
+    } catch (error) {
+      if (
+        error.message !== "Not enough seats available" &&
+        error.message !== "No available vehicle found"
+      ) {
+        throw error;
+      }
+    }
+  }
 };

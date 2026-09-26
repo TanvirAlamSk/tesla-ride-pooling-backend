@@ -1,6 +1,36 @@
 import { RideRequest } from "./ride-request.model.js";
 import { matchRideRequest } from "../pool/pool.service.js";
 
+// export const createRideRequest = async ({
+//   passengerId,
+//   pickupArea,
+//   destinationArea,
+//   requestedSeats,
+// }) => {
+//   const existingRide = await RideRequest.findOne({
+//     passengerId,
+//     status: {
+//       $in: ["WAITING", "MATCHED", "IN_PROGRESS"],
+//     },
+//   });
+
+//   if (existingRide) {
+//     throw new Error("You already have an active ride request");
+//   }
+
+//   const rideRequest = await RideRequest.create({
+//     passengerId,
+//     pickupArea,
+//     destinationArea,
+//     requestedSeats,
+//     status: "WAITING",
+//   });
+
+//   await matchRideRequest(rideRequest);
+
+//   return rideRequest;
+// };
+
 export const createRideRequest = async ({
   passengerId,
   pickupArea,
@@ -26,7 +56,16 @@ export const createRideRequest = async ({
     status: "WAITING",
   });
 
-  await matchRideRequest(rideRequest);
+  try {
+    await matchRideRequest(rideRequest);
+  } catch (error) {
+    if (
+      error.message !== "Not enough seats available" &&
+      error.message !== "No available vehicle found"
+    ) {
+      throw error;
+    }
+  }
 
   return rideRequest;
 };
