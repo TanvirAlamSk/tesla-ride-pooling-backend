@@ -5,6 +5,10 @@ import mongoose from "mongoose";
 import { User } from "./modules/user/user.model.js";
 import { Vehicle } from "./modules/vehicle/vehicle.model.js";
 
+import { RideRequest } from "./modules/ride/ride-request.model.js";
+import { Pool } from "./modules/pool/pool.model.js";
+import { PoolMember } from "./modules/pool/pool-member.model.js";
+
 const seed = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
@@ -12,6 +16,9 @@ const seed = async () => {
     console.log("MongoDB connected");
 
     // Clear existing demo data
+    await PoolMember.deleteMany({});
+    await Pool.deleteMany({});
+    await RideRequest.deleteMany({});
     await Vehicle.deleteMany({});
     await User.deleteMany({});
 

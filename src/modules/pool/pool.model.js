@@ -36,4 +36,14 @@ const poolSchema = new mongoose.Schema(
   }
 );
 
+poolSchema.index(
+  { vehicleId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: "OPEN",
+    },
+  }
+);
+
 export const Pool = mongoose.model("Pool", poolSchema);

@@ -31,6 +31,16 @@ const poolMemberSchema = new mongoose.Schema(
   }
 );
 
+poolMemberSchema.index(
+  { poolId: 1, passengerId: 1 },
+  { unique: true }
+);
+
+poolMemberSchema.index(
+  { rideRequestId: 1 },
+  { unique: true }
+);
+
 export const PoolMember = mongoose.model(
   "PoolMember",
   poolMemberSchema
