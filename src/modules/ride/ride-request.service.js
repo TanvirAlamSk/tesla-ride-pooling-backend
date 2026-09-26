@@ -7,14 +7,6 @@ export const createRideRequest = async ({
   destinationArea,
   requestedSeats,
 }) => {
-  const rideRequest = await RideRequest.create({
-    passengerId,
-    pickupArea,
-    destinationArea,
-    requestedSeats,
-    status: "WAITING",
-  });
-
   const existingRide = await RideRequest.findOne({
     passengerId,
     status: {
@@ -25,6 +17,14 @@ export const createRideRequest = async ({
   if (existingRide) {
     throw new Error("You already have an active ride request");
   }
+
+  const rideRequest = await RideRequest.create({
+    passengerId,
+    pickupArea,
+    destinationArea,
+    requestedSeats,
+    status: "WAITING",
+  });
 
   await matchRideRequest(rideRequest);
 

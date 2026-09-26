@@ -49,9 +49,25 @@ export const joinPool = async (rideRequest, pool) => {
 
   const farePaisa = calculateFare(distanceKm);
 
-  const availableSeats = pool.capacity - pool.occupiedSeats;
+  const updatedPool = await Pool.findOneAndUpdate(
+    {
+      _id: pool._id,
+      status: "OPEN",
+      occupiedSeats: {
+        $lte: pool.capacity - rideRequest.requestedSeats,
+      },
+    },
+    {
+      $inc: {
+        occupiedSeats: rideRequest.requestedSeats,
+      },
+    },
+    {
+      new: true,
+    },
+  );
 
-  if (availableSeats < rideRequest.requestedSeats) {
+  if (!updatedPool) {
     throw new Error("Not enough seats available");
   }
 
@@ -61,8 +77,6 @@ export const joinPool = async (rideRequest, pool) => {
     rideRequestId: rideRequest._id,
     farePaisa,
   });
-  pool.occupiedSeats += rideRequest.requestedSeats;
-  await pool.save();
 
   rideRequest.poolId = pool._id;
   rideRequest.farePaisa = farePaisa;
@@ -72,8 +86,6 @@ export const joinPool = async (rideRequest, pool) => {
 
   return poolMember;
 };
-
-
 
 export const createPoolForRide = async (rideRequest) => {
   const vehicle = await Vehicle.findOne({
@@ -90,7 +102,7 @@ export const createPoolForRide = async (rideRequest) => {
 
   const distanceKm = getRouteDistance(
     rideRequest.pickupArea,
-    rideRequest.destinationArea
+    rideRequest.destinationArea,
   );
 
   if (distanceKm === null) {
@@ -122,7 +134,6 @@ export const createPoolForRide = async (rideRequest) => {
   return pool;
 };
 
-
 export const matchRideRequest = async (rideRequest) => {
   const matchingPool = await findMatchingPool(rideRequest);
 
@@ -132,7 +143,6 @@ export const matchRideRequest = async (rideRequest) => {
 
   return createPoolForRide(rideRequest);
 };
-
 
 export const matchExistingRideRequest = async (rideId) => {
   const rideRequest = await RideRequest.findById(rideId);
