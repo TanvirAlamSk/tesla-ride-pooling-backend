@@ -1,4 +1,4 @@
-import { registerUser,loginUser } from "./auth.service.js";
+import { registerUser, loginUser } from "./auth.service.js";
 
 export const loginController = async (req, res) => {
   try {
@@ -27,9 +27,11 @@ export const registerController = async (req, res) => {
       data: user,
     });
   } catch (error) {
-    res.status(400).json({
+    console.error(error);
+
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: error.message,
+      message: error.statusCode ? error.message : "Internal server error",
     });
   }
 };
@@ -40,4 +42,3 @@ export const getMeController = async (req, res) => {
     data: req.user,
   });
 };
-

@@ -10,9 +10,11 @@ export const getMyVehicleController = async (req, res) => {
       data: vehicle,
     });
   } catch (error) {
-    res.status(404).json({
+    console.error(error);
+
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: error.message,
+      message: error.statusCode ? error.message : "Internal server error",
     });
   }
 };

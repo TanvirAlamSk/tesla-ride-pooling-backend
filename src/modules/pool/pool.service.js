@@ -30,10 +30,7 @@ export const findMatchingPool = async (rideRequest) => {
         continue;
       }
 
-      if (
-        canShareRoute(existingRequest, rideRequest) &&
-        pool.occupiedSeats + rideRequest.requestedSeats <= pool.capacity
-      ) {
+      if (canShareRoute(existingRequest, rideRequest)) {
         return pool;
       }
     }
@@ -147,7 +144,14 @@ export const matchRideRequest = async (rideRequest) => {
   const matchingPool = await findMatchingPool(rideRequest);
 
   if (matchingPool) {
-    return joinPool(rideRequest, matchingPool);
+    if (
+      matchingPool.occupiedSeats + rideRequest.requestedSeats <=
+      matchingPool.capacity
+    ) {
+      return joinPool(rideRequest, matchingPool);
+    }
+
+    return rideRequest;
   }
 
   return createPoolForRide(rideRequest);

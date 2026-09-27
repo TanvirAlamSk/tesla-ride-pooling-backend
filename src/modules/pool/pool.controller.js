@@ -18,7 +18,7 @@ export const getMyPool = async (req, res) => {
 
     const pool = await Pool.findOne({
       vehicleId: vehicle._id,
-      $in: ["OPEN", "IN_PROGRESS"],
+      status: { $in: ["OPEN", "IN_PROGRESS"] },
     }).populate("vehicleId");
 
     if (!pool) {
@@ -36,6 +36,7 @@ export const getMyPool = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
+      extra:"have a problem",
       message: error.message,
     });
   }
@@ -72,7 +73,7 @@ export const updatePoolStatusController = async (req, res) => {
 
     res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : "Internal server error",
+      message: error.statusCode ? error.message : "Internal server error...",
     });
   }
 };

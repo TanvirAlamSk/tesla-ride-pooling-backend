@@ -1,4 +1,8 @@
-import { createRideRequest,getMyRideRequests,getRideRequestById } from "./ride-request.service.js";
+import {
+  createRideRequest,
+  getMyRideRequests,
+  getRideRequestById,
+} from "./ride-request.service.js";
 
 export const createRideRequestController = async (req, res) => {
   try {
@@ -15,7 +19,7 @@ export const createRideRequestController = async (req, res) => {
       data: rideRequest,
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(404).json({
       success: false,
       message: error.message,
     });
@@ -50,9 +54,18 @@ export const getRideRequestByIdController = async (req, res) => {
       data: ride,
     });
   } catch (error) {
-    res.status(404).json({
+    console.error(error);
+
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: error.message,
+      message: error.statusCode ? error.message : "Internal server error",
     });
   }
 };
+
+// catch (error) {
+//     res.status(404).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
