@@ -7,6 +7,7 @@ import { RideStatusHistory } from "../ride/ride-status-history.model.js";
 import { canShareRoute } from "./route-matching.js";
 import { getRouteDistance } from "../ride/route-distance.js";
 import { calculateFare } from "../ride/fare.js";
+import { AppError } from "../../utils/AppError.js";
 
 export const findMatchingPool = async (rideRequest) => {
   const openPools = await Pool.find({
@@ -29,7 +30,10 @@ export const findMatchingPool = async (rideRequest) => {
         continue;
       }
 
-      if (canShareRoute(existingRequest, rideRequest)) {
+      if (
+        canShareRoute(existingRequest, rideRequest) &&
+        pool.occupiedSeats + rideRequest.requestedSeats <= pool.capacity
+      ) {
         return pool;
       }
     }
@@ -136,6 +140,10 @@ export const createPoolForRide = async (rideRequest) => {
 };
 
 export const matchRideRequest = async (rideRequest) => {
+  if (rideRequest.status !== "WAITING") {
+    throw new Error("Ride request is not waiting");
+  }
+
   const matchingPool = await findMatchingPool(rideRequest);
 
   if (matchingPool) {
@@ -170,7 +178,7 @@ export const updatePoolStatus = async ({ poolId, driverId, newStatus }) => {
     }).session(session);
 
     if (!vehicle) {
-      throw new Error("Vehicle not found");
+      throw new AppError("Vehicle not found", 404);
     }
 
     const pool = await Pool.findOne({
@@ -179,7 +187,7 @@ export const updatePoolStatus = async ({ poolId, driverId, newStatus }) => {
     }).session(session);
 
     if (!pool) {
-      throw new Error("Pool not found");
+      throw new AppError("Pool not found", 404);
     }
 
     const allowedTransitions = {
@@ -192,6 +200,7 @@ export const updatePoolStatus = async ({ poolId, driverId, newStatus }) => {
     if (!allowedTransitions[pool.status].includes(newStatus)) {
       throw new Error(
         `Cannot change pool status from ${pool.status} to ${newStatus}`,
+        400,
       );
     }
 
@@ -200,6 +209,10 @@ export const updatePoolStatus = async ({ poolId, driverId, newStatus }) => {
     await pool.save({ session });
 
     if (newStatus === "IN_PROGRESS") {
+      vehicle.status = "OFFLINE";
+
+      await vehicle.save({ session });
+
       const rideRequests = await RideRequest.find({
         poolId: pool._id,
         status: "MATCHED",
@@ -223,6 +236,10 @@ export const updatePoolStatus = async ({ poolId, driverId, newStatus }) => {
         );
       }
     } else if (newStatus === "COMPLETED") {
+      vehicle.status = "AVAILABLE";
+
+      await vehicle.save({ session });
+
       const rideRequests = await RideRequest.find({
         poolId: pool._id,
         status: "IN_PROGRESS",
@@ -249,6 +266,10 @@ export const updatePoolStatus = async ({ poolId, driverId, newStatus }) => {
 
     await session.commitTransaction();
 
+    if (newStatus === "COMPLETED") {
+      await matchWaitingRideRequests();
+    }
+
     return pool;
   } catch (error) {
     await session.abortTransaction();
@@ -258,8 +279,6 @@ export const updatePoolStatus = async ({ poolId, driverId, newStatus }) => {
     await session.endSession();
   }
 };
-
-
 
 export const matchWaitingRideRequests = async () => {
   const waitingRequests = await RideRequest.find({

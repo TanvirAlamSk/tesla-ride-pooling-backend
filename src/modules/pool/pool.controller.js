@@ -1,6 +1,7 @@
 import { Vehicle } from "../vehicle/vehicle.model.js";
 import { Pool } from "./pool.model.js";
 import { updatePoolStatus } from "./pool.service.js";
+import { updatePoolStatusSchema } from "./pool.validation.js";
 
 export const getMyPool = async (req, res) => {
   try {
@@ -17,7 +18,7 @@ export const getMyPool = async (req, res) => {
 
     const pool = await Pool.findOne({
       vehicleId: vehicle._id,
-      status: "OPEN",
+      $in: ["OPEN", "IN_PROGRESS"],
     }).populate("vehicleId");
 
     if (!pool) {
@@ -40,11 +41,20 @@ export const getMyPool = async (req, res) => {
   }
 };
 
-
 export const updatePoolStatusController = async (req, res) => {
   try {
     const { poolId } = req.params;
-    const { status } = req.body;
+    const validation = updatePoolStatusSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid pool status",
+        errors: validation.error.flatten(),
+      });
+    }
+
+    const { status } = validation.data;
 
     const pool = await updatePoolStatus({
       poolId,
@@ -58,9 +68,11 @@ export const updatePoolStatusController = async (req, res) => {
       data: pool,
     });
   } catch (error) {
-    res.status(400).json({
+    console.error(error);
+
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: error.message,
+      message: error.statusCode ? error.message : "Internal server error",
     });
   }
 };
